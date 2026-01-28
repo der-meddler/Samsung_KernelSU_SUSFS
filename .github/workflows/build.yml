@@ -140,8 +140,8 @@ jobs:
 
           else
               echo "⚠ Not a git repo, using defaults"
-              KSU_VERSION=$BASE_VERSION
-              KSU_GIT_TAG="v0.0.1"
+              KSU_VERSION=33151
+              KSU_GIT_TAG="v3.0.0"
           fi
 
           echo "Computed version: $KSU_VERSION"
