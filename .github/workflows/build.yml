@@ -56,19 +56,6 @@ jobs:
           git clone https://github.com/WildKernels/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://github.com/WildKernels/kernel_patches.git
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-
-          cd susfs4ksu
-          TARGET="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-          COMMIT=""
-          case "$TARGET" in
-            android12-5.10) COMMIT="8a76ba240d1f7315352b49d97d854a4b166e5b47" ;;
-            android13-5.10) COMMIT="e5c9eabfc6dcfc677d11f46ce1d5ff786de60a92" ;;
-            android13-5.15) COMMIT="babf6be195576f09aae79650d47abf6a76e8a21b" ;;
-            android14-5.15) COMMIT="19f339e804ba9aebd9c6d735b965e2b9396c73ae" ;;
-            android14-6.1) COMMIT="a162e2469d0b472545e5e46457eee171c0975fb0" ;;
-            android15-6.6) COMMIT="f450ec00bf592d080f59b01ff6f9242456c9a427" ;;
-          esac
-          git checkout "$COMMIT"
       
       - name: Clone Kernel Source
         run: |
@@ -78,7 +65,6 @@ jobs:
       - name: Set Path Environment Variables
         run: |
           ROOT="$GITHUB_WORKSPACE"
-          # KERNEL_ROOT="$CONFIG"
           SUSFS4KSU="$ROOT/susfs4ksu"
           KERNEL_PATCHES="$ROOT/kernel_patches"
           ANYKERNEL3="$ROOT/AnyKernel3"
@@ -91,13 +77,14 @@ jobs:
           else
             COMMON="$CONFIG/kernel_platform/common"
           fi
+          DEFCONFIG="$COMMON/arch/arm64/configs/gki_defconfig"
 
           echo "ROOT=$ROOT" >> $GITHUB_ENV
-          # echo "KERNEL_ROOT=$KERNEL_ROOT" >> $GITHUB_ENV
           echo "SUSFS4KSU=$SUSFS4KSU" >> $GITHUB_ENV
           echo "KERNEL_PATCHES=$KERNEL_PATCHES" >> $GITHUB_ENV
           echo "ANYKERNEL3=$ANYKERNEL3" >> $GITHUB_ENV
           echo "COMMON=$COMMON" >> $GITHUB_ENV
+          echo "DEFCONFIG=$DEFCONFIG" >> $GITHUB_ENV
           
       - name: Extract all tar.xz files and delete them
         run: |
@@ -121,38 +108,68 @@ jobs:
           cd "$CONFIG"
           du -BG -d 2 | sort -nr
 
-      - name: Add KernelSU
+      - name: Add Wild_KSU
         run: |
           cd "$COMMON"
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
 
-      - name: Getting KernelSU Version
+      - name: Getting Wild_KSU Version
         run: |
           cd "$COMMON/Wild_KSU/kernel"
           
-          BASE_VERSION=10200
-          COMMIT_COUNT=$(/usr/bin/git rev-list --count HEAD)
-          KSU_VERSION=$(expr $COMMIT_COUNT "+" $BASE_VERSION)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          
-          # change KSU version in makefile, scamsung things
-          MAKEFILE="Makefile"
-          sed -i "s/ccflags-y += -DKSU_VERSION=[0-9]\+/ccflags-y += -DKSU_VERSION=${KSU_VERSION}/" "$MAKEFILE"
-          echo "✅ Updated KSU version to ${KSU_VERSION} in $MAKEFILE"
+          KSU_DIR=$(pwd)
+          KBUILD="Kbuild"
+          BASE_VERSION=30000
 
-      - name: Apply SUSFS Patches for KernelSU Variants
+          if [ -d "$KSU_DIR/.git" ]; then
+              echo "✔ Git repo detected"
+
+              # Unshallow if needed
+              if [ -f "$KSU_DIR/.git/shallow" ]; then
+                  git -C "$KSU_DIR" fetch --unshallow || true
+              fi
+
+              # Get commit count
+              KSU_GIT_VERSION=$(git -C "$KSU_DIR" rev-list --count HEAD)
+
+              # Calculate version
+              KSU_VERSION=$((BASE_VERSION + KSU_GIT_VERSION))
+
+              # Get latest tag (safe)
+              KSU_GIT_TAG=$(git -C "$KSU_DIR" describe --tags --abbrev=0 2>/dev/null || echo "v0.0.1")
+
+          else
+              echo "⚠ Not a git repo, using defaults"
+              KSU_VERSION=$BASE_VERSION
+              KSU_GIT_TAG="v0.0.1"
+          fi
+
+          echo "Computed version: $KSU_VERSION"
+          echo "Computed tag: $KSU_GIT_TAG"
+
+          # Export for CI (optional)
+          echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
+          echo "KSU_VERSION_TAG=$KSU_GIT_TAG" >> $GITHUB_ENV
+
+          # --- Update Kbuild fallback values ---
+
+          # Update numeric fallback
+          sed -i "s/KSU_VERSION_FALLBACK := [0-9]\+/KSU_VERSION_FALLBACK := ${KSU_VERSION}/" "$KBUILD"
+
+          # Update tag fallback
+          sed -i "s/KSU_VERSION_TAG_FALLBACK := .*/KSU_VERSION_TAG_FALLBACK := ${KSU_GIT_TAG}/" "$KBUILD"
+
+          echo "✅ Updated fallback values in $KBUILD"
+
+      - name: Apply SUSFS Patches
         run: |
           cd "$COMMON"
           # Apply compatibility fixes
-          SUSFS_VERSION="1.5.12"
+          SUSFS_VERSION="2.0.0"
           
           cp "$SUSFS4KSU/kernel_patches/fs/"* ./fs/
           cp "$SUSFS4KSU/kernel_patches/include/linux/"* ./include/linux/
-
-
-          # Apply core SUSFS patches
-          cp "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" ./
-          
+          cp "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" ./          
 
           # Apply SUSFS core patch
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
@@ -195,46 +212,41 @@ jobs:
             patch -p1 < fix_base.patch
           fi
 
-          # Apply KSU integration patches
-          cd Wild_KSU
-          
-            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
-          
-            cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch" ./
-            patch -p1 < fix_core_hook.c.patch
-
-            cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch" ./
-            patch -p1 < fix_sucompat.c.patch
-
-            cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch" ./
-            patch -p1 < fix_kernel_compat.c.patch
-
-      - name: Apply Hooks Patches
-        run: |
-          cd "$COMMON"
-          cp "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.4.patch" ./         
-          
-          if [[ "${{ inputs.branch }}" == "SM-A366B" || "${{ inputs.branch }}" == "SM-A546B-Oneui7" || "${{ inputs.branch }}" == "SM-A566B" || "${{ inputs.branch }}" == "SM-S926B-Oneui8" ]]; then
-           patch -p1 < scope_min_manual_hooks_v1.4.patch || true
-          else
-           patch -p1 < scope_min_manual_hooks_v1.4.patch || true
-           patch -p1 < fix_exec.patch
-          fi
-
       - name: Add BBG
         run: |          
           cd "$COMMON"
           echo "Adding BBG..."
-          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' security/Kconfig
-          cat security/Kconfig
+          curl -LSs https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+          echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
       - name: Set Kernel Configuration Variables
         run: |
           cd "$COMMON"
           echo "Initializing kernel configuration..."
-          patch -p1 < config.patch
+          cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+          # KernelSU Configuration
+          CONFIG_KSU=y
+          CONFIG_KSU_SUSFS=y
+
+          # KPatch Next Support
+          CONFIG_KALLSYMS=y
+          CONFIG_KALLSYMS_ALL=y
+
+          # Mountify Support
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+
+          # nuke root protection
+          CONFIG_UH=n
+          CONFIG_UH_RKP=n
+          CONFIG_UH_LKMAUTH=n
+          CONFIG_UH_LKM_BLOCK=n
+          CONFIG_RKP_CFP_JOPP=n
+          CONFIG_RKP_CFP=n
+          CONFIG_SECURITY_DEFEX=n
+          CONFIG_PROCA=n
+          CONFIG_FIVE=n
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./build.config.gki
