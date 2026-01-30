@@ -188,6 +188,7 @@ jobs:
             patch -p1 < fix_base.patch
             patch -p1 < Disable_CRC.patch
             patch -p1 < fix_exec.patch
+            patch -p1 < configLSM.patch
           elif [[ "${{ inputs.branch }}" == "SM-A566B" ]]; then
             cp "$KERNEL_PATCHES/samsung/${{ inputs.branch }}/"* ./
             patch -p1 < fix_namespace.patch
@@ -249,10 +250,6 @@ jobs:
           CONFIG_MODULE_SIG=n
           CONFIG_MODULE_COMPRESS=n
           CONFIG_TRIM_UNUSED_KSYMS=n
-          EOF
-
-           # Modify CONFIG_LSM line to insert baseband_guard
-            sed -i '/^CONFIG_LSM=/ s/lockdown,/lockdown,baseband_guard,/' "$DEFCONFIG"
           fi
           
           cd "$COMMON"
