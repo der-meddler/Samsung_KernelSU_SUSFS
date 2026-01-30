@@ -255,6 +255,7 @@ jobs:
             sed -i '/^CONFIG_LSM=/ s/lockdown,/lockdown,baseband_guard,/' "$DEFCONFIG"
           fi
           
+          cd "$COMMON"
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./build.config.gki
 
