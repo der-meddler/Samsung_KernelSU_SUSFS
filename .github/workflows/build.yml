@@ -325,7 +325,7 @@ jobs:
             cp ./kernel_platform/sec/dist/Image "$ANYKERNEL3/Image"
           elif [[ -f ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ]]; then
             cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image "$ANYKERNEL3/Image"
-          elif [[ "${{ inputs.branch }}" == "SM-X916B" || "${{ inputs.branch }}" == "SM-F946N" || "${{ inputs.branch }}" == "SM-F946B-Oneui8" | "${{ inputs.branch }}" == "SM-S916B-Oneui8" || "${{ inputs.branch }}" == "SM-S918B-Oneui8" ]]; then
+          elif [[ "${{ inputs.branch }}" == "SM-X916B" || "${{ inputs.branch }}" == "SM-F946N" || "${{ inputs.branch }}" == "SM-F946B-Oneui8" || "${{ inputs.branch }}" == "SM-S916B-Oneui8" || "${{ inputs.branch }}" == "SM-S918B-Oneui8" ]]; then
             cp ./out/msm-kalama-kalama-gki/dist/Image "$ANYKERNEL3/Image"
           elif [[ "${{ inputs.branch }}" == "SM-A546B-Oneui7" || "${{ inputs.branch }}" == "SM-A546E-Oneui7" ]]; then
             cp ./arch/arm64/boot/Image "$ANYKERNEL3/Image"
