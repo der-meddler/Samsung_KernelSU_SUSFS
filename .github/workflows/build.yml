@@ -307,7 +307,7 @@ jobs:
           set -x
           cd "$CONFIG"
           echo "Building the kernel..."
-          if [[ "${{ inputs.branch }}" == "SM-S928B-Oneui7" || "${{ inputs.branch }}" == "SM-S928B-Oneui8" ]]; then
+          if [[ "${{ inputs.branch }}" == "SM-S928B-Oneui7" || "${{ inputs.branch }}" == "SM-S928B-Oneui8" || "${{ inputs.branch }}" == "SM-S938B-Oneui7" ]]; then
             chmod +x build_kernel_GKI.sh
             ./build_kernel_GKI.sh
           elif [[ "${{ inputs.branch }}" == "SM-X916B" || "${{ inputs.branch }}" == "SM-F946N" || "${{ inputs.branch }}" == "SM-S916B-Oneui8" || "${{ inputs.branch }}" == "SM-S918B-Oneui8" || "${{ inputs.branch }}" == "SM-F946B-Oneui8" ]]; then
@@ -343,7 +343,7 @@ jobs:
           #  exit 1
           #fi
           
-          if [[ "${{ inputs.branch }}" == "SM-S928B-Oneui7" || "${{ inputs.branch }}" == "SM-S928B-Oneui8" ]]; then
+          if [[ "${{ inputs.branch }}" == "SM-S928B-Oneui7" || "${{ inputs.branch }}" == "SM-S928B-Oneui8" || "${{ inputs.branch }}" == "SM-S938B-Oneui7" ]]; then
             cp ./kernel_platform/sec/dist/Image "$ANYKERNEL3/Image"
           elif [[ -f ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ]]; then
             cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image "$ANYKERNEL3/Image"
