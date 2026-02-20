@@ -79,6 +79,11 @@ jobs:
           fi
           DEFCONFIG="$COMMON/arch/arm64/configs/gki_defconfig"
 
+          if [[ "${{ inputs.branch }}" == "SM-S938B-Oneui7" ]]; then
+            SECDEFCONFIG=$COMMON/arch/arm64/configs/gki_sec_defconfig
+            echo "SECDEFCONFIG=$SECDEFCONFIG" >> $GITHUB_ENV
+          fi
+
           echo "ROOT=$ROOT" >> $GITHUB_ENV
           echo "SUSFS4KSU=$SUSFS4KSU" >> $GITHUB_ENV
           echo "KERNEL_PATCHES=$KERNEL_PATCHES" >> $GITHUB_ENV
@@ -241,18 +246,22 @@ jobs:
           # Mountify Support
           CONFIG_TMPFS_XATTR=y
           CONFIG_TMPFS_POSIX_ACL=y
-
-          # nuke root protection
-          CONFIG_UH=n
-          CONFIG_UH_RKP=n
-          CONFIG_UH_LKMAUTH=n
-          CONFIG_UH_LKM_BLOCK=n
-          CONFIG_RKP_CFP_JOPP=n
-          CONFIG_RKP_CFP=n
-          CONFIG_SECURITY_DEFEX=n
-          CONFIG_PROCA=n
-          CONFIG_FIVE=n
           EOF
+
+          if [[ "${{ inputs.branch }}" != "SM-S938B-Oneui7" ]]; then
+           cat >> "$DEFCONFIG" << 'EOF'
+           # nuke root protection
+           CONFIG_UH=n
+           CONFIG_UH_RKP=n
+           CONFIG_UH_LKMAUTH=n
+           CONFIG_UH_LKM_BLOCK=n
+           CONFIG_RKP_CFP_JOPP=n
+           CONFIG_RKP_CFP=n
+           CONFIG_SECURITY_DEFEX=n
+           CONFIG_PROCA=n
+           CONFIG_FIVE=n
+           EOF
+          fi
 
           if [[ "${{ inputs.branch }}" == "SM-A546B-Oneui7" || "${{ inputs.branch }}" == "SM-A546E-Oneui7" ]]; then
           cat >> "$DEFCONFIG" << 'EOF'
