@@ -212,6 +212,25 @@ jobs:
 #            patch -p1 < fix_base.patch
 #          fi
 
+      - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
+        if: ${{ inputs.kernel_version == '6.6' }}
+        run: |
+         cd "$COMMON"
+         
+         SYMBOL_LIST=android/abi_gki_aarch64_galaxy
+         echo "kdp_set_cred_non_rcu" >> $SYMBOL_LIST
+         echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST
+         echo "kdp_usecount_inc" >> $SYMBOL_LIST
+
+         PATCH="$KERNEL_PATCHES/samsung/min_kdp/add-min_kdp-symbols.patch"
+         if patch -p1 --dry-run < "$PATCH"; then
+          patch -p1 --no-backup-if-mismatch < $PATCH
+         fi
+
+         cp "$KERNEL_PATCHES/samsung/min_kdp/min_kdp.c" drivers/min_kdp.c
+         echo "obj-y += min_kdp.o" >> drivers/Makefile
+         fi
+
       - name: Add BBG
         run: |          
           cd "$COMMON"
