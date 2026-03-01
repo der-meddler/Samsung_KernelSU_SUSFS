@@ -338,7 +338,7 @@ jobs:
           set -x
           cd "$CONFIG"
           echo "Building the kernel..."
-          if [[ "${{ inputs.branch }}" == "SM-S928B-Oneui7" || "${{ inputs.branch }}" == "SM-S928B-Oneui8" || "${{ inputs.branch }}" == "SM-S938B-Oneui7" ]]; then
+          if [[ "${{ inputs.branch }}" == "SM-S928B-Oneui7" || "${{ inputs.branch }}" == "SM-S928B-Oneui8" || "${{ inputs.branch }}" == "SM-S938B-Oneui7" || "${{ inputs.branch }}" == "SM-S901E-Oneui8" ]]; then
             chmod +x build_kernel_GKI.sh
             ./build_kernel_GKI.sh
           elif [[ "${{ inputs.branch }}" == "SM-X916B" || "${{ inputs.branch }}" == "SM-F946N" || "${{ inputs.branch }}" == "SM-S916B-Oneui8" || "${{ inputs.branch }}" == "SM-S918B-Oneui8" || "${{ inputs.branch }}" == "SM-F946B-Oneui8" ]]; then
@@ -388,6 +388,8 @@ jobs:
             cp ./kernel-6.6/out/arch/arm64/boot/Image "$ANYKERNEL3/Image"
           elif [[ "${{ inputs.branch }}" == "SM-S926B-Oneui8" ]]; then
             cp ./out/s5e9945_user/dist/Image "$ANYKERNEL3/Image"
+          elif [[ "${{ inputs.branch }}" == "SM-S901E-Oneui8" ]]; then
+            cp ./out/msm-waipo-waipo-gki/dist/Image "$ANYKERNEL3/Image"
           else
             echo "Error: Image file not found in any expected location"
             exit 1
