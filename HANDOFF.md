@@ -35,3 +35,8 @@ Read this (and the memory files) before continuing. Everything below is already 
 - Toolchain pinned in `toolchain/manifest.tsv` (gitiles tarballs, clang-r487747c). WildKernels' A556B branch kernel == our
   SABYI1 + 3 include patches (in `patches/a556b`) + BUILD_NUMBER (generated from the source tag).
 - User preferences: keep agent usage minimal (no fleets), open-source tools, zsh Bash-tool quirks (see memory).
+
+## Roadmap (user, 2026-10-16)
+1. KSU LKM mode (experimental), 2. KPM for KPatch-Next (APatch-based) modules, 3. Samsung securities already off
+(keep KNOX on), 4. analyse/fix Lyinceer's TWRP decryption zip in ~/Documents (breaks Wi-Fi), 5. super.img
+modification (EROFS), 6. two TWRP device trees (current One UI 7 firmware, and the Android 16 firmware).
