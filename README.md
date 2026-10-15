@@ -1,3 +1,31 @@
+# A556B builder (der-meddler fork)
+
+This fork builds **one** device, the Galaxy A55 5G (SM-A556B, Exynos 1480 / s5e8845,
+android14-6.1), from the pristine Samsung source in
+[der-meddler/A556B-source](https://github.com/der-meddler/A556B-source) instead of a
+`WildKernels/Samsung_Kernels` branch. WildKernels' feature actions are used unchanged;
+everything of ours lives in separate files so `git merge upstream/main` stays conflict-free:
+
+| path | purpose |
+| --- | --- |
+| `.github/workflows/a556b.yml` | the build: *Run workflow* with the source ref, features, LTO and `runner` = `github` or `local` (self-hosted runner in the Droidspaces container) |
+| `.github/actions/a556b/source` | materialise the source tree, move `projects/` beside `kernel/`, add `WORKSPACE`, apply `patches/a556b`, pin `BUILD_NUMBER` to the source tag |
+| `.github/actions/a556b/toolchain` + `toolchain/manifest.tsv` | the AOSP Kleaf build system and prebuilts (clang-r487747c, build-tools, bazel, jdk11, sysroots) as pinned gitiles tarballs |
+| `.github/actions/a556b/{build,ak3zip-prep,...}` | Bazel build of `//projects/s5e8845:s5e8845_user`, AnyKernel3 packaging, naming |
+| `patches/a556b/` | the small source edits WildKernels carry on their `SM-A556B-Oneui7-bitA` branch (include reorders the SUSFS patch needs) |
+| `scripts/build-locally.sh` | the same sequence without Actions, for a shell in the container |
+| `.github/workflows/sync-upstream.yml` | daily: fast-forward `main` from WildKernels and merge it into `a556b` (needs the `FORK_SYNC_TOKEN` secret) |
+| `.github/workflows/sync-wildkernels-patches.yml` | weekly: regenerate `patches/a556b` from jimsterino's A556B branch and open a PR when it changed |
+| `.github/runner/` | job-started gate for the shared self-hosted runner |
+
+Branches: `main` mirrors upstream, `a556b` is ours. Upstream's `main.yml` (the 63-device matrix)
+is disabled in this fork. Flash the `*-AnyKernel3.zip` artifact with the KernelSU-Next manager
+or a custom recovery; `vendor_boot`, `init_boot`, `vendor_dlkm` and `dtbo` stay stock. Droidspaces
+works without PID/CPU limits (those options would change the stock-module ABI), and SUSFS'
+"hide sus mounts for all processes" must stay off for containers to boot.
+
+---
+
 <div align="center">
 
 # 🔥 Wild Kernels for Samsung

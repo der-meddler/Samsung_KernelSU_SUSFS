@@ -1,0 +1,124 @@
+name: Sync WildKernels A556B source patches
+
+# jimsterino maintains the Samsung sources in WildKernels/Samsung_Kernels, one branch per
+# device, with a few of his own commits on top of each Samsung import. His tree cannot be
+# merged into der-meddler/A556B-source (different git history, kernel under kernel/), so
+# his small commits are carried as patches/a556b/*.patch and applied at build time.
+# This job regenerates that patch set from his branch: every commit on it that touches
+# kernel/ and is not a Samsung import (those add thousands of files) becomes one patch,
+# minus the BUILD_NUMBER edit in scripts/setlocalversion (the source action derives it
+# from the source tag). If the set changed and still applies to our source tip, a pull
+# request is opened; a newer Samsung import on his branch is only reported, because that
+# is a new hotfix drop for A556B-source, not a patch.
+
+on:
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: WildKernels/Samsung_Kernels branch to read
+        type: string
+        default: SM-A556B-Oneui7-bitA
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WK_BRANCH: ${{ inputs.branch || 'SM-A556B-Oneui7-bitA' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout builder
+        uses: actions/checkout@v5
+
+      - name: Read jimsterino's branch
+        run: |
+          set -euo pipefail
+          # blobless, no checkout: only commit metadata and the few touched blobs are fetched
+          git clone -q --filter=blob:none --no-checkout --single-branch -b "$WK_BRANCH" \
+            https://github.com/WildKernels/Samsung_Kernels.git wk
+          cd wk
+          mkdir -p ../new-patches
+          : > ../wk-report.md
+          n=0
+          for c in $(git rev-list --reverse HEAD); do
+            files=$(git diff-tree --no-commit-id -r --name-only "$c" | grep -c '^kernel/' || true)
+            [ "$files" -gt 0 ] || continue
+            subject=$(git log -1 --format=%s "$c")
+            if [ "$files" -gt 200 ]; then
+              echo "- import commit \`${c:0:9}\` (${files} files): ${subject}" >> ../wk-report.md
+              continue
+            fi
+            # his edit, as a patch relative to the Linux tree root (our layout)
+            if [ "$(git diff-tree --no-commit-id -r --name-only "$c" | grep -v '^kernel/scripts/setlocalversion$' | grep -c '^kernel/' || true)" -eq 0 ]; then
+              echo "- skipped \`${c:0:9}\` (setlocalversion only, BUILD_NUMBER is generated): ${subject}" >> ../wk-report.md
+              continue
+            fi
+            n=$((n + 1))
+            git format-patch -1 --relative=kernel --no-signature --zero-commit -o ../new-patches "$c" >/dev/null
+            echo "- patch $(printf '%04d' "$n") from \`${c:0:9}\`: ${subject}" >> ../wk-report.md
+          done
+          echo "patches generated: $n"
+          cat ../wk-report.md
+
+      - name: Compare with the current patch set
+        id: diff
+        run: |
+          set -euo pipefail
+          norm() { grep -v -e '^index ' -e '^From ' -e '^Date: ' "$1"; }
+          changed=false
+          old=$(ls patches/a556b/*.patch 2>/dev/null | wc -l); new=$(ls new-patches/*.patch 2>/dev/null | wc -l)
+          if [ "$old" != "$new" ]; then changed=true; else
+            i=0
+            for np in new-patches/*.patch; do
+              i=$((i + 1)); op=$(ls patches/a556b/*.patch | sed -n "${i}p")
+              diff -q <(norm "$np") <(norm "$op") >/dev/null || changed=true
+            done
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "patch set changed: $changed"
+
+      - name: Check the new set applies to A556B-source
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 https://github.com/der-meddler/A556B-source.git src
+          for p in new-patches/*.patch; do
+            echo "checking $(basename "$p")"
+            git -C src apply --check "../$p"
+          done
+
+      - name: Open a pull request
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="sync/wildkernels-patches-$(date -u +%Y%m%d)"
+          git checkout -q -b "$branch"
+          rm -f patches/a556b/*.patch
+          i=0
+          for p in new-patches/*.patch; do
+            i=$((i + 1))
+            cp "$p" "patches/a556b/$(printf '%04d' "$i")-$(sed -n 's/^Subject: \[PATCH[^]]*\] //p' "$p" | head -n1 | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//').patch"
+          done
+          git add patches/a556b
+          git commit -q -m "patches/a556b: refresh from WildKernels $WK_BRANCH" -m "$(cat wk-report.md)"
+          git push -q origin "$branch"
+          gh pr create --base "${{ github.ref_name }}" --head "$branch" \
+            --title "Refresh A556B source patches from WildKernels $WK_BRANCH" \
+            --body-file wk-report.md
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          { echo "## WildKernels/Samsung_Kernels $WK_BRANCH"; cat wk-report.md 2>/dev/null || true;
+            echo; echo "patch set changed: ${{ steps.diff.outputs.changed || 'n/a' }}"; } >> "$GITHUB_STEP_SUMMARY"

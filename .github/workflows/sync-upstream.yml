@@ -1,0 +1,65 @@
+name: Sync with WildKernels
+
+# Keeps this fork current with WildKernels/Samsung_KernelSU_SUSFS without hand work:
+#   1. main is a pure mirror of upstream main and is fast-forwarded through GitHub's
+#      "Sync fork" API (merge-upstream).
+#   2. a556b (our default branch) then merges main. Upstream's files are never edited
+#      here (everything of ours is in separate files), so the merge is conflict-free; if
+#      it ever is not, the job fails and leaves the conflict for a human.
+# Needs the FORK_SYNC_TOKEN secret: a fine-grained PAT for this repository with
+# Contents: write and Workflows: write (upstream commits touch .github/workflows, which
+# GITHUB_TOKEN may not push). Without it the job only reports what it would do.
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only report, change nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
+      DRY_RUN: ${{ inputs.dry_run == true || secrets.FORK_SYNC_TOKEN == '' }}
+    steps:
+      - name: Fast-forward main from upstream
+        run: |
+          set -euo pipefail
+          up=$(gh api repos/WildKernels/Samsung_KernelSU_SUSFS/commits/main --jq .sha)
+          ours=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          echo "upstream main: $up"; echo "our main:      $ours"
+          if [ "$up" = "$ours" ]; then echo "main is current"; exit 0; fi
+          if [ "$DRY_RUN" = true ]; then echo "dry run (or no FORK_SYNC_TOKEN): would merge-upstream main"; exit 0; fi
+          gh api -X POST "repos/${{ github.repository }}/merge-upstream" -f branch=main --jq .message
+
+      - name: Checkout a556b
+        if: env.DRY_RUN != 'true'
+        uses: actions/checkout@v5
+        with:
+          ref: a556b
+          fetch-depth: 0
+          token: ${{ secrets.FORK_SYNC_TOKEN }}
+
+      - name: Merge main into a556b
+        if: env.DRY_RUN != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch -q origin main
+          if git merge-base --is-ancestor origin/main HEAD; then echo "a556b already contains main"; exit 0; fi
+          git merge --no-edit origin/main
+          git push origin HEAD:a556b
+          echo "merged $(git rev-parse --short origin/main) into a556b"
