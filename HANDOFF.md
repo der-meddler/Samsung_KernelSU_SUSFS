@@ -11,19 +11,20 @@ Read this (and the memory files) before continuing. Everything below is already 
   Workflow `.github/workflows/a556b.yml` (dispatch: source_ref, runner github|local, features, lto, release_type).
   Upstream files untouched → `git merge upstream/main` is conflict-free. Sync automations: sync-upstream.yml
   (needs secret FORK_SYNC_TOKEN: fine-grained PAT, this repo, Contents+Workflows write), sync-wildkernels-patches.yml.
-- **Test build** started 2026-10-16 01:00 in the Droidspaces arch container on this PC as user `claude`:
+- **Test build PASSED** 2026-10-16 01:27 in the Droidspaces arch container (user `claude`): bazel 19.5 min, Image 38.3 MB,
+  release `6.1.93-android14-11-abA556BXXSABYI1-Wild`, no rejected hunks, all features in the embedded config.
+  Artifacts copied to `~/Documents/A556B-builder/dist/` (gitignored). Container details:
   `ssh -i ~/.ssh/container_claude -o IdentitiesOnly=yes -p 2222 claude@127.0.0.1` → `~/a556b/build.log`,
   exit code in `~/a556b/build.status` when finished, outputs in `~/a556b/ws/dist/`. Script: `builder/scripts/build-locally.sh`
   (WS=~/a556b/ws). Workspace `~/a556b/ws/a556b/` keeps the toolchain + bazel cache for reruns.
 
 ## Next steps
-1. Check the test build result (status/log). Fix whatever failed in the builder (commit to `a556b`, push, rerun
-   `builder/scripts/build-locally.sh` after `git -C ~/a556b/builder pull`).
-2. When it passes: `gh repo edit der-meddler/Samsung_KernelSU_SUSFS --default-branch a556b` (Run-workflow button needs it),
+1. (done) local test build passed; rerun any time with `git -C ~/a556b/builder pull && WS=~/a556b/ws bash ~/a556b/builder/scripts/build-locally.sh`.
+2. USER DECISION PENDING: `gh repo edit der-meddler/Samsung_KernelSU_SUSFS --default-branch a556b` (Run-workflow button needs it),
    `gh workflow disable main.yml -R der-meddler/Samsung_KernelSU_SUSFS` (upstream's 63-device matrix).
 3. User (root in container): install the widened runner gate from `.github/runner/job-started-gate.sh`
    (reinstall command in its header) so `runner=local` works; then dispatch a556b.yml with runner=local.
-4. Dispatch a556b.yml with runner=github once to validate the hosted path (free-disk + 25 GB swap, ~25-40 min).
+4. Dispatch a556b.yml with runner=github once (refused until a556b is the default branch: "workflow not found on the default branch") to validate the hosted path (free-disk + 25 GB swap, ~25-40 min).
 5. Flash the `*-AnyKernel3.zip` on the A55 (KernelSU-Next manager / recovery); verify Wi-Fi/BT, KSU, SUSFS,
    NoMount, Droidspaces (keep SUSFS "hide sus mounts for all processes" OFF).
 6. Later phases: droidspaces fine-tuning, super.img, maybe TWRP (see memory a55x-twrp-research in the A137F memory dir).
