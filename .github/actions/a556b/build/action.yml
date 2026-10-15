@@ -1,0 +1,29 @@
+name: build kernel
+description: Kleaf/Bazel build of Samsung's s5e8845_user target, the way WildKernels build the SM-A556B branches
+inputs:
+  bazel_flags:
+    description: Extra flags appended to the bazel build command (e.g. sandbox or cache settings for a local runner)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: bazel build //projects/s5e8845:s5e8845_user
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$CONFIG"
+
+        BAZEL_LTO=""
+        if [[ "$BUILD_LTO" == "thin" || "$BUILD_LTO" == "full" ]]; then
+          BAZEL_LTO="--lto=$BUILD_LTO"
+        fi
+
+        # Samsung's README builds //projects/s5e8845:s5e8845_user_dist, which also packs boot,
+        # vendor_boot, dtbo and the dlkm images and needs packages the drop does not ship. Only
+        # Image goes into boot.img here, so the kernel_build target alone is enough.
+        set -x
+        tools/bazel build --nocheck_bzl_visibility --config=stamp --sandbox_debug \
+          --verbose_failures --debug_make_verbosity=I $BAZEL_LTO ${{ inputs.bazel_flags }} \
+          //projects/s5e8845:s5e8845_user

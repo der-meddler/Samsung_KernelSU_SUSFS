@@ -1,0 +1,21 @@
+# Kleaf toolchain for Samsung's android14-6.1 drop (kernel/build.config.constants: CLANG_VERSION=r487747c).
+# Every line: <destination in the workspace> <gitiles project> <commit> [<subdirectory of the project>]
+# Projects and paths come from the AOSP kernel manifest branch common-android14-6.1 (default revision
+# main-kernel-build-2023), pinned to the commits those branches pointed at on 2026-10-16. Each entry is
+# downloaded as https://android.googlesource.com/<project>/+archive/<commit>[/<subdir>].tar.gz and
+# extracted into the destination, so no git metadata and no host bazel/JDK are needed:
+# tools/bazel runs prebuilts/bazel with prebuilts/jdk/jdk11 and the clang prebuilt with its own sysroot.
+build/kernel	kernel/build	7fa5c5bc8b5ad452b9c2536b231ea4185fe450b1
+build/bazel_common_rules	platform/build/bazel_common_rules	62c496cd1d821948d2f4a7fcf702e54416e5a754
+external/bazel-skylib	platform/external/bazel-skylib	f998e5dc13c03f0eae9e373263d3afff0932c738
+external/stardoc	platform/external/stardoc	e83f522ee95419e55d2c5654aa6e0143beeef595
+external/python/absl-py	platform/external/python/absl-py	2f199605a9875340569e039657f8b4c72d51b84d
+prebuilts/bazel/linux-x86_64	platform/prebuilts/bazel/linux-x86_64	7bfbec9e829bbae6816d5f39aba345df76e627c1
+prebuilts/jdk/jdk11	platform/prebuilts/jdk/jdk11	649eec4416e2ed6298af49a56876772767a0e5ae
+prebuilts/build-tools	platform/prebuilts/build-tools	4649614b4030ad825f2e94401d04526651f44e88
+prebuilts/kernel-build-tools	kernel/prebuilts/build-tools	e905be252a53d20c52bd9e59df3ff8fdd46b9eab
+prebuilts/clang/host/linux-x86	platform/prebuilts/clang/host/linux-x86	382db94fa9597402b69e252c36bf9902cc283b82
+prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8	platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8	f6d40532273c8bd628b960ecc0970c7294c8d891
+# Kleaf only uses the NDK's sysroot (build/kernel/kleaf/ndk.BUILD), the rest of ndk-r23 is 1.4 GB of unused binaries.
+prebuilts/ndk-r23/toolchains/llvm/prebuilt/linux-x86_64/sysroot	toolchain/prebuilts/ndk/r23	19ac7e4eded12adb99d4f613490dde6dd0e72664	toolchains/llvm/prebuilt/linux-x86_64/sysroot
+tools/mkbootimg	platform/system/tools/mkbootimg	615a1fced5f8e2755642d30357674d3bfa21b85e

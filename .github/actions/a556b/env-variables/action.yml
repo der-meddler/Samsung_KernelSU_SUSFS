@@ -1,0 +1,28 @@
+name: set variables
+description: >
+  Environment the WildKernels feature actions expect: ROOT, ANYKERNEL3,
+  KERNEL_PATCHES, COMMON (the Linux tree) and GKI_DEFCONFIG (the fragment the
+  feature actions write to). Our workspace is $CONFIG with kernel/ and projects/.
+
+runs:
+  using: composite
+  steps:
+    - name: set dependency directory variables
+      shell: bash
+      run: |
+        ROOT="$GITHUB_WORKSPACE"
+        echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+        echo "ANYKERNEL3=$ROOT/AnyKernel3" >> "$GITHUB_ENV"
+        echo "KERNEL_PATCHES=$ROOT/kernel_patches" >> "$GITHUB_ENV"
+
+    - name: set kernel tree variables
+      shell: bash
+      run: |
+        COMMON="$CONFIG/kernel"
+        test -f "$COMMON/Makefile" && test -d "$COMMON/arch/arm64"
+        echo "COMMON=$COMMON" >> "$GITHUB_ENV"
+        # Samsung merges gki_defconfig + the s5e8845 fragments at build time (see
+        # projects/s5e8845/build.config.s5e8845_user); feature configs go into gki_defconfig
+        # exactly as WildKernels do for the SM-A556 branches, the Samsung security options are
+        # switched off in s5e8845-bazel_defconfig by the upstream configs action.
+        echo "GKI_DEFCONFIG=$COMMON/arch/arm64/configs/gki_defconfig" >> "$GITHUB_ENV"

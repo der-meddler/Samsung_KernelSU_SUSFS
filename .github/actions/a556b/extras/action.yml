@@ -1,0 +1,18 @@
+name: A556B extras
+description: small additions on top of the WildKernels feature set
+inputs:
+  macvlan:
+    description: enable CONFIG_MACVLAN (Droidspaces' docs recommend it for macvlan networking, WildKernels leave it out)
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: macvlan
+      if: inputs.macvlan == 'true'
+      shell: bash
+      run: |
+        # include/linux/if_macvlan.h only switches inline helpers on CONFIG_MACVLAN, no exported
+        # struct changes, so stock vendor modules keep loading.
+        "$COMMON/scripts/config" --file "$GKI_DEFCONFIG" --enable CONFIG_MACVLAN

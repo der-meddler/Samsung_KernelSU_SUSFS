@@ -1,0 +1,17 @@
+name: clone dependencies
+description: WildKernels' patch collection and their AnyKernel3 template, always at their latest commit
+
+runs:
+  using: composite
+  steps:
+    - name: clone kernel patches and AnyKernel3
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Re-cloned every run (also on a persistent self-hosted workspace) so the feature
+        # actions never see files left behind by an earlier build.
+        rm -rf kernel_patches AnyKernel3
+        git clone -q --depth 1 https://github.com/WildKernels/kernel_patches.git
+        git clone -q --depth 1 -b gki-2.0 https://github.com/WildKernels/AnyKernel3.git
+        echo "kernel_patches: $(git -C kernel_patches rev-parse --short HEAD)"
+        echo "AnyKernel3:     $(git -C AnyKernel3 rev-parse --short HEAD)"

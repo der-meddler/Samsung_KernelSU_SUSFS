@@ -1,0 +1,43 @@
+name: prepare ak3
+description: copy the built Image into the AnyKernel3 folder and sanity-check its embedded config
+
+runs:
+  using: composite
+  steps:
+    - name: locate Image and copy it to AnyKernel3
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$CONFIG"
+        # bazel-bin/projects/s5e8845/<kernel_build name>/Image; the find is only a fallback in
+        # case Samsung's macro ever changes the output directory name.
+        KERNEL_IMAGE=""
+        for f in bazel-bin/projects/s5e8845/s5e8845_user/Image bazel-bin/projects/s5e8845/*/Image; do
+          if [ -f "$f" ]; then KERNEL_IMAGE="$f"; break; fi
+        done
+        if [ -z "$KERNEL_IMAGE" ]; then
+          # the physical location the bazel-bin link points at (Kleaf keeps the output base under out/)
+          KERNEL_IMAGE=$(find out/bazel/output_user_root -type f -path '*/bin/projects/s5e8845/*/Image' 2>/dev/null | head -n1 || true)
+        fi
+        if [ -z "$KERNEL_IMAGE" ]; then
+          echo "::error::no Image under $CONFIG/bazel-bin, the build did not produce a kernel"
+          exit 1
+        fi
+        echo "Image: $KERNEL_IMAGE ($(stat -L -c %s "$KERNEL_IMAGE") bytes)"
+        cp -L "$KERNEL_IMAGE" "$ANYKERNEL3/Image"
+        echo "KERNEL_IMAGE=$CONFIG/$KERNEL_IMAGE" >> "$GITHUB_ENV"
+
+    - name: check the embedded config
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Samsung's RKP/KDP/DEFEX/PROCA/FIVE must be off (the configs action switches them off),
+        # and the feature options must have made it into the final config.
+        "$COMMON/scripts/extract-ikconfig" "$KERNEL_IMAGE" > ikconfig.txt
+        grep -E '^(# )?CONFIG_(UH|RKP|KDP|KDP_NS|KDP_CRED|SECURITY_DEFEX|PROCA|FIVE|LTO_(NONE|CLANG_THIN|CLANG_FULL)|KSU|KSU_SUSFS|NOMOUNT|BBG|NTSYNC|TCP_CONG_BBR3|SYSVIPC|PID_NS|USER_NS|IPC_NS|MACVLAN|IP6_NF_NAT|MODVERSIONS|MODULE_SIG|MODULE_SIG_PROTECT|LOCALVERSION)( |=)' ikconfig.txt || true
+        for bad in CONFIG_UH CONFIG_RKP CONFIG_KDP CONFIG_SECURITY_DEFEX CONFIG_PROCA CONFIG_FIVE; do
+          if grep -q "^$bad=y" ikconfig.txt; then
+            echo "::error::$bad is still enabled in the built Image"
+            exit 1
+          fi
+        done

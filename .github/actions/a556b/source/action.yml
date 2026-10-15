@@ -1,0 +1,81 @@
+name: Fetch A556B kernel source
+description: >
+  Materialise der-meddler/A556B-source (Linux tree at its root, Samsung's Kleaf
+  project configs under projects/) as the kernel/ and projects/ packages of a
+  Kleaf workspace in $CONFIG, then apply the small source fixes the SUSFS patch
+  needs and pin the Samsung build number into the version string.
+inputs:
+  repo:
+    description: GitHub repository holding the kernel source
+    required: false
+    default: der-meddler/A556B-source
+  ref:
+    description: Branch, tag or commit of that repository to build
+    required: false
+    default: main
+
+runs:
+  using: composite
+  steps:
+    - name: Materialise the source tree
+      shell: bash
+      run: |
+        set -euo pipefail
+        URL="https://github.com/${{ inputs.repo }}.git"
+        REF="${{ inputs.ref }}"
+        MIRROR="$CONFIG/.source-mirror.git"
+        KDIR="$CONFIG/kernel"
+
+        # A bare mirror is kept between runs on a persistent (self-hosted) workspace, so a
+        # rebuild only fetches what changed. The tree itself is re-extracted from it every
+        # run with git archive: no .git inside kernel/, so Kleaf's stamping produces the same
+        # stock-like release string WildKernels ship (no -g<sha>, never -dirty), and leftovers
+        # from earlier feature steps (KernelSU-Next, NoMount, patches) can never survive.
+        mkdir -p "$MIRROR"
+        [ -f "$MIRROR/HEAD" ] || git -C "$MIRROR" init -q --bare
+        git -C "$MIRROR" fetch -q --depth 1 "$URL" "$REF"
+        SHA=$(git -C "$MIRROR" rev-parse FETCH_HEAD)
+
+        # The Samsung firmware this commit corresponds to, taken from the tag that points at
+        # it (A556BXXSABYI1 and friends); falls back to the short sha for untagged commits.
+        TAG=$(git -C "$MIRROR" ls-remote --tags "$URL" \
+          | awk -v s="$SHA" '$1 == s { sub("refs/tags/", "", $2); sub(/\^\{\}$/, "", $2); print $2 }' \
+          | head -n1)
+        [ -n "$TAG" ] || TAG="g${SHA:0:12}"
+
+        rm -rf "$KDIR" "$CONFIG/projects"
+        mkdir -p "$KDIR"
+        git -C "$MIRROR" archive --format=tar FETCH_HEAD | tar -xf - -C "$KDIR"
+
+        # The drop's Kleaf layout is Kernel/{kernel,projects,WORKSPACE}; the source repo keeps
+        # projects/ inside the Linux tree, so move it back next to it.
+        mv "$KDIR/projects" "$CONFIG/projects"
+        cp "$GITHUB_WORKSPACE/workspace/WORKSPACE" "$CONFIG/WORKSPACE"
+
+        echo "SOURCE_SHA=$SHA" >> "$GITHUB_ENV"
+        echo "SOURCE_TAG=$TAG" >> "$GITHUB_ENV"
+        echo "Source: ${{ inputs.repo }}@$REF -> $SHA ($TAG)"
+
+    - name: Apply the include-order fixes the SUSFS patch relies on
+      shell: bash
+      run: |
+        set -euo pipefail
+        # WildKernels' only source changes on their SM-A556B-Oneui7-bitA branch: three include
+        # reorders in fs/exec.c, fs/namespace.c and fs/proc/base.c that make the context lines
+        # of susfs4ksu's 50_add_susfs_in_gki-android14-6.1.patch match this Samsung tree.
+        for p in "$GITHUB_WORKSPACE"/patches/a556b/*.patch; do
+          echo "Applying $(basename "$p")"
+          patch -p1 -d "$CONFIG/kernel" --no-backup-if-mismatch < "$p"
+        done
+
+    - name: Pin the Samsung build number into the version string
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Same effect as WildKernels' hardcoded BUILD_NUMBER=A556BXXSABYI1 in scripts/setlocalversion,
+        # but derived from the source tag, so a build of a newer hotfix tag names itself correctly:
+        # uname -r ends in -ab<tag> like the stock kernel does.
+        cd "$CONFIG/kernel"
+        grep -q '^# finally, add the abXXX number if BUILD_NUMBER is set$' scripts/setlocalversion
+        sed -i "s/^# finally, add the abXXX number if BUILD_NUMBER is set\$/&\nBUILD_NUMBER=${SOURCE_TAG}/" scripts/setlocalversion
+        grep -n 'BUILD_NUMBER=' scripts/setlocalversion

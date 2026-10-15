@@ -1,0 +1,86 @@
+name: Kleaf toolchain
+description: >
+  Fetch the AOSP Kleaf build system and prebuilt toolchain the Samsung drop expects
+  (build/, external/, prebuilts/, tools/) into the workspace from android.googlesource.com,
+  pinned by toolchain/manifest.tsv. On a persistent workspace the download is skipped when
+  the same manifest is already installed.
+inputs:
+  samsung_prebuilts_url:
+    description: >
+      Optional URL of a tar.xz with the drop's prebuilts/boot-artifacts and prebuilts/platform
+      (only the _dist packaging targets need them; the kernel_build target does not).
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch pinned Kleaf projects
+      shell: bash
+      run: |
+        set -euo pipefail
+        MANIFEST="$GITHUB_WORKSPACE/toolchain/manifest.tsv"
+        STAMP="$CONFIG/.toolchain-stamp"
+        WANT=$(sha256sum "$MANIFEST" | cut -c1-64)
+        if [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$WANT" ] && [ -x "$CONFIG/tools/bazel" ]; then
+          echo "toolchain already installed for manifest $WANT"
+          exit 0
+        fi
+        rm -f "$STAMP"
+        cd "$CONFIG"
+        grep -v '^#' "$MANIFEST" | grep -v '^[[:space:]]*$' | while IFS=$'\t' read -r dest project sha subdir; do
+          url="https://android.googlesource.com/${project}/+archive/${sha}"
+          [ -n "${subdir:-}" ] && url="${url}/${subdir}"
+          url="${url}.tar.gz"
+          echo "::group::$dest  <-  $url"
+          rm -rf "$dest"
+          mkdir -p "$dest"
+          # gitiles streams a tar.gz of the tree at that commit without a top-level directory;
+          # modes and symlinks are preserved. Retried because the service occasionally returns 429/5xx.
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL --retry 3 "$url" | tar -xz -C "$dest"; then break; fi
+            [ "$attempt" -lt 5 ] || { echo "::error::download of $url failed"; exit 1; }
+            echo "retrying $url ($attempt)"; sleep $((attempt * 15))
+          done
+          echo "$(find "$dest" -type f | wc -l) files"
+          echo "::endgroup::"
+        done
+        # the manifest's linkfile: tools/bazel -> build/kernel/kleaf/bazel.sh
+        mkdir -p tools
+        ln -sfn ../build/kernel/kleaf/bazel.sh tools/bazel
+        echo "$WANT" > "$STAMP"
+
+    - name: Verify the toolchain matches the source tree
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$CONFIG"
+        CLANG_VERSION=$(sed -n 's/^CLANG_VERSION=//p' kernel/build.config.constants)
+        test -n "$CLANG_VERSION"
+        if [ ! -x "prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin/clang" ]; then
+          echo "::error::the source tree wants clang-${CLANG_VERSION} but the toolchain manifest does not provide it; update toolchain/manifest.tsv"
+          exit 1
+        fi
+        test -x tools/bazel
+        test -x prebuilts/bazel/linux-x86_64/bazel
+        test -x prebuilts/build-tools/path/linux-x86/python3
+        test -d prebuilts/jdk/jdk11/linux-x86
+        test -d prebuilts/kernel-build-tools/linux-x86
+        test -d prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/sysroot
+        test -d prebuilts/ndk-r23/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+        test -f build/kernel/kleaf/bazel.py
+        test -f WORKSPACE
+        echo "clang-${CLANG_VERSION}: $(prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin/clang --version | head -n1)"
+        du -sh prebuilts build external tools 2>/dev/null || true
+
+    - name: Samsung prebuilts (optional, packaging targets only)
+      if: inputs.samsung_prebuilts_url != ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$CONFIG"
+        if [ -d prebuilts/platform ] && [ -d prebuilts/boot-artifacts ]; then
+          echo "Samsung prebuilts already present"; exit 0
+        fi
+        curl -fsSL --retry 3 "${{ inputs.samsung_prebuilts_url }}" | tar -xJ -C "$CONFIG"
+        test -d prebuilts/platform && test -d prebuilts/boot-artifacts

@@ -1,0 +1,23 @@
+name: set kernel name
+description: append a suffix to the kernel release string and never mark it dirty
+inputs:
+  suffix:
+    description: Text appended to uname -r (WildKernels use -Wild)
+    required: false
+    default: -Wild
+
+runs:
+  using: composite
+  steps:
+    - name: add the suffix to the kernel name
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$COMMON"
+        SUFFIX='${{ inputs.suffix }}'
+        if [ -n "$SUFFIX" ]; then
+          # the last line of scripts/setlocalversion is   echo "$res"
+          sed -i "\$s|echo \"\\\$res\"|echo \"\\\$res${SUFFIX}\"|" scripts/setlocalversion
+        fi
+        sed -i 's/-dirty//' scripts/setlocalversion
+        tail -n 3 scripts/setlocalversion

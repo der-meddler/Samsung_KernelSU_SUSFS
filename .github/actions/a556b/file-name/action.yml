@@ -1,0 +1,47 @@
+name: set file name for ak3zip
+description: artifact name from the source tag and the enabled features
+inputs:
+  ksun:
+    required: true
+  susfs:
+    required: true
+  nomount:
+    required: true
+  bbg:
+    required: true
+  bbrv3:
+    required: true
+  droidspaces:
+    required: true
+  ntsync:
+    required: true
+  ipv6_nat:
+    required: true
+  ttl:
+    required: true
+  unicodefix:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: set file name for ak3zip
+      shell: bash
+      run: |
+        ARTIFACT_BASE="SM-A556B-${SOURCE_TAG}"
+        FILE_NAME="${ARTIFACT_BASE}"
+        [[ "${{ inputs.ksun }}" == "true" ]] && FILE_NAME="${FILE_NAME}-KSUN${KSU_VERSION:-}"
+        [[ "${{ inputs.susfs }}" == "true" ]] && FILE_NAME="${FILE_NAME}-SUSFS"
+        [[ "${{ inputs.nomount }}" == "true" ]] && FILE_NAME="${FILE_NAME}-NM"
+        [[ "${{ inputs.bbg }}" == "true" ]] && FILE_NAME="${FILE_NAME}-BBG"
+        [[ "${{ inputs.bbrv3 }}" == "true" ]] && FILE_NAME="${FILE_NAME}-BBRV3"
+        [[ "${{ inputs.droidspaces }}" == "true" ]] && FILE_NAME="${FILE_NAME}-DS"
+        [[ "${{ inputs.ntsync }}" == "true" ]] && FILE_NAME="${FILE_NAME}-NTS"
+        [[ "${{ inputs.ipv6_nat }}" == "true" ]] && FILE_NAME="${FILE_NAME}-IPv6_IP-set"
+        [[ "${{ inputs.ttl }}" == "true" ]] && FILE_NAME="${FILE_NAME}-TTL"
+        [[ "${{ inputs.unicodefix }}" == "true" ]] && FILE_NAME="${FILE_NAME}-UF"
+        [[ "$BUILD_LTO" == "thin" || "$BUILD_LTO" == "full" ]] && FILE_NAME="${FILE_NAME}-LTO_${BUILD_LTO}"
+
+        echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> "$GITHUB_ENV"
+        echo "FILE_NAME=$FILE_NAME" >> "$GITHUB_ENV"
+        echo "Artifact name: $FILE_NAME"

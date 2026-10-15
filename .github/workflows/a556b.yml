@@ -1,0 +1,404 @@
+name: Build A556B kernel
+
+# One device, one source: der-meddler/A556B-source built the WildKernels way
+# (KernelSU-Next + SUSFS + NoMount + BBG + Droidspaces + the rest) with Samsung's
+# Kleaf/Bazel setup for s5e8845. Runs on GitHub's hosted runners or, with
+# runner=local, on the self-hosted runner in the Droidspaces arch container.
+#
+# Upstream's own workflows (main.yml, kernel-samsung.yml, build.yml) and actions are
+# left untouched so `git merge upstream/main` stays conflict-free; everything of
+# ours lives under .github/actions/a556b/, patches/, workspace/ and this file.
+#
+# Flash the AnyKernel3 zip from the run's artifacts (or the release) with the
+# KernelSU-Next manager or a custom recovery; vendor_boot, init_boot, vendor_dlkm
+# and dtbo stay stock.
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, tag or commit of der-meddler/A556B-source to build
+        required: true
+        type: string
+        default: main
+      runner:
+        description: Where to build (local = self-hosted runner in the Droidspaces container)
+        required: true
+        type: choice
+        options: [github, local]
+        default: github
+      release_type:
+        description: Keep the zip as a workflow artifact only, or also publish a GitHub release
+        required: true
+        type: choice
+        options: [Actions, Pre-Release, Release]
+        default: Actions
+      lto:
+        description: LTO (default = Samsung's LTO_NONE)
+        required: true
+        type: choice
+        options: [default, thin, full]
+        default: default
+      kernel_suffix:
+        description: Suffix appended to uname -r
+        required: false
+        type: string
+        default: -Wild
+      ksun:
+        description: KernelSU-Next (latest maintainer commit at build time)
+        type: boolean
+        default: true
+      susfs:
+        description: SUSFS (pershoot's dev-susfs KSU-Next + susfs4ksu gki-android14-6.1)
+        type: boolean
+        default: true
+      nomount:
+        description: NoMount
+        type: boolean
+        default: true
+      bbg:
+        description: Baseband Guard
+        type: boolean
+        default: true
+      unicodefix:
+        description: Unicode fix
+        type: boolean
+        default: true
+      droidspace:
+        description: Droidspaces support (no PID/CPU limits, they would break the stock-module ABI)
+        type: boolean
+        default: true
+      macvlan:
+        description: CONFIG_MACVLAN for Droidspaces macvlan networking
+        type: boolean
+        default: true
+      ntsync:
+        description: NTsync
+        type: boolean
+        default: true
+      bbrv3:
+        description: TCP BBRv3 + CAKE/PIE qdiscs
+        type: boolean
+        default: true
+      ipv6_nat:
+        description: IPv6 NAT and IP sets
+        type: boolean
+        default: true
+      ttl:
+        description: TTL/HL targets
+        type: boolean
+        default: true
+      optimization:
+        description: WildKernels optimization patches
+        type: boolean
+        default: true
+      clean:
+        description: local runner only, throw away the Bazel output of the previous build first
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.runner }}
+
+env:
+  # Kept identical to WildKernels' branch name: their feature actions key device-specific
+  # behaviour on BRANCH starting with SM-A556 (defconfig nuking, memcmp patch, build target).
+  BRANCH: SM-A556B-Oneui7-bitA
+  KERNEL_VER: "6.1"
+  ANDROID_VER: android14
+  BUILD_LTO: ${{ inputs.lto }}
+  # Self-hosted runner in the container: no user namespaces for Bazel's linux-sandbox, so run
+  # Kbuild unsandboxed with a persistent OUT_DIR (--config=local, incremental rebuilds), and
+  # leave two of the eight cores to the host.
+  LOCAL_BAZEL_FLAGS: --config=local --make_jobs=6
+
+jobs:
+  build:
+    name: SM-A556B ${{ inputs.source_ref }} on ${{ inputs.runner }}
+    runs-on: >-
+      ${{ inputs.runner == 'local' && fromJSON('["self-hosted", "droidspaces"]') || 'ubuntu-latest' }}
+    timeout-minutes: 300
+
+    steps:
+      - name: Checkout builder
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Workspace paths
+        run: |
+          # $CONFIG is the Kleaf workspace root: WORKSPACE, kernel/, projects/, prebuilts/, build/, tools/
+          echo "CONFIG=$GITHUB_WORKSPACE/a556b" >> "$GITHUB_ENV"
+
+      # ---- hosted runner only: make room for the toolchain and the Bazel output ----
+      - name: Free disk space
+        if: inputs.runner == 'github'
+        uses: endersonmenezes/free-disk-space@v3
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+          remove_swap: true
+          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+          remove_packages_one_command: true
+          remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+          rm_cmd: "rmz"
+          rmz_version: "3.1.1"
+          testing: false
+
+      - name: Setup more swap (for LTO)
+        if: inputs.runner == 'github'
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 25
+
+      # ---- local runner only ----
+      - name: Clean previous Bazel output
+        if: inputs.runner == 'local' && inputs.clean
+        run: |
+          if [ -x "$CONFIG/tools/bazel" ] && [ -f "$CONFIG/WORKSPACE" ]; then
+            (cd "$CONFIG" && tools/bazel clean --expunge) || true
+          fi
+
+      # ---- sources ----
+      - name: WildKernels patches and AnyKernel3
+        uses: ./.github/actions/a556b/dependencies
+
+      - name: Kernel source
+        uses: ./.github/actions/a556b/source
+        with:
+          ref: ${{ inputs.source_ref }}
+
+      - name: Kleaf toolchain
+        uses: ./.github/actions/a556b/toolchain
+
+      - name: Path variables
+        uses: ./.github/actions/a556b/env-variables
+
+      # ---- features, in WildKernels' order, using their actions unchanged ----
+      - name: Add KernelSU-Next
+        if: inputs.ksun
+        uses: ./.github/actions/ksun
+        with:
+          susfs: ${{ inputs.susfs }}
+
+      - name: Add SUSFS
+        if: inputs.ksun && inputs.susfs
+        uses: ./.github/actions/susfs-patches
+
+      - name: Add NoMount
+        if: inputs.ksun && inputs.nomount
+        uses: ./.github/actions/nomount
+
+      - name: Add BBG
+        if: inputs.bbg
+        uses: ./.github/actions/bbg
+
+      - name: Add unicode fix
+        if: inputs.unicodefix
+        uses: ./.github/actions/unicode
+
+      - name: Add Droidspaces support
+        if: inputs.droidspace
+        uses: ./.github/actions/droidspaces
+
+      - name: A556B extras
+        uses: ./.github/actions/a556b/extras
+        with:
+          macvlan: ${{ inputs.droidspace && inputs.macvlan }}
+
+      - name: Add ntsync
+        if: inputs.ntsync
+        uses: ./.github/actions/ntsync
+
+      - name: Add BBRv3
+        if: inputs.bbrv3
+        uses: ./.github/actions/bbrv3
+
+      - name: Add IP sets and IPv6 NAT
+        if: inputs.ipv6_nat
+        uses: ./.github/actions/IPv6_NAT
+
+      - name: Add TTL support
+        if: inputs.ttl
+        uses: ./.github/actions/TTL
+
+      - name: Add optimization patches
+        if: inputs.optimization
+        uses: ./.github/actions/optimization
+
+      - name: Kernel configuration (root support, Samsung security off)
+        if: inputs.ksun
+        uses: ./.github/actions/configs
+
+      - name: Kernel name
+        uses: ./.github/actions/a556b/kernel-name
+        with:
+          suffix: ${{ inputs.kernel_suffix }}
+
+      - name: Remove protected exports (Wi-Fi and Bluetooth with stock modules)
+        uses: ./.github/actions/abi-export
+
+      - name: Artifact name
+        uses: ./.github/actions/a556b/file-name
+        with:
+          ksun: ${{ inputs.ksun }}
+          susfs: ${{ inputs.ksun && inputs.susfs }}
+          nomount: ${{ inputs.ksun && inputs.nomount }}
+          bbg: ${{ inputs.bbg }}
+          bbrv3: ${{ inputs.bbrv3 }}
+          droidspaces: ${{ inputs.droidspace }}
+          ntsync: ${{ inputs.ntsync }}
+          ipv6_nat: ${{ inputs.ipv6_nat }}
+          ttl: ${{ inputs.ttl }}
+          unicodefix: ${{ inputs.unicodefix }}
+
+      - name: Configure LTO
+        uses: ./.github/actions/lto
+
+      # ---- build ----
+      - name: Build
+        uses: ./.github/actions/a556b/build
+        with:
+          bazel_flags: ${{ inputs.runner == 'local' && env.LOCAL_BAZEL_FLAGS || '' }}
+
+      - name: Prepare AnyKernel3
+        uses: ./.github/actions/a556b/ak3zip-prep
+
+      - name: Upload AnyKernel3 artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.FILE_NAME }}-AnyKernel3
+          path: ./AnyKernel3/**
+          compression-level: 9
+          if-no-files-found: error
+
+      - name: Upload Image and config
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.FILE_NAME }}-Image
+          path: |
+            ./AnyKernel3/Image
+            ./ikconfig.txt
+          if-no-files-found: error
+
+      - name: Collect patch rejects
+        if: ${{ always() }}
+        run: |
+          mkdir -p patch-rejects
+          find "$CONFIG/kernel" -type f -name '*.rej' 2>/dev/null | while read -r rej; do
+            rel="${rej#"$CONFIG/kernel"/}"
+            mkdir -p "patch-rejects/$(dirname "$rel")"
+            cp "$rej" "patch-rejects/$rel"
+            [ -f "${rej%.rej}" ] && cp "${rej%.rej}" "patch-rejects/${rel%.rej}"
+            echo "$rel" >> patch-rejects/index.txt
+          done
+          if [ -f patch-rejects/index.txt ]; then
+            echo "::warning::rejected patch hunks:"; cat patch-rejects/index.txt
+          else
+            echo "no rejected hunks"
+          fi
+
+      - name: Upload patch rejects
+        if: ${{ always() && hashFiles('patch-rejects/index.txt') != '' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.FILE_NAME || 'build' }}-Rejected-Patches
+          path: ./patch-rejects/**
+
+      - name: Build summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## ${FILE_NAME:-build}"
+            echo "- source: ${SOURCE_TAG:-?} (\`${SOURCE_SHA:-?}\`) of der-meddler/A556B-source @ \`${{ inputs.source_ref }}\`"
+            echo "- runner: ${{ inputs.runner }}, LTO: ${{ inputs.lto }}"
+            if [ -d "$CONFIG/kernel/KernelSU-Next" ]; then
+              echo "- KernelSU-Next: $(git -C "$CONFIG/kernel/KernelSU-Next" rev-parse HEAD) (${KSU_GIT_TAG:-} / ${KSU_VERSION:-})"
+            fi
+            [ -d susfs4ksu ] && echo "- susfs4ksu: $(git -C susfs4ksu rev-parse HEAD)"
+            [ -d "$CONFIG/kernel/NoMount" ] && echo "- NoMount: $(git -C "$CONFIG/kernel/NoMount" rev-parse HEAD)"
+            [ -d "$CONFIG/kernel/Baseband-guard" ] && echo "- Baseband-guard: $(git -C "$CONFIG/kernel/Baseband-guard" rev-parse HEAD)"
+            [ -d kernel_patches ] && echo "- kernel_patches: $(git -C kernel_patches rev-parse HEAD)"
+            if [ -f AnyKernel3/Image ]; then echo "- Image: $(stat -c %s AnyKernel3/Image) bytes"; else echo "- Image: missing"; fi
+            if [ -f patch-rejects/index.txt ]; then echo "- rejected hunks:"; sed 's/^/  - /' patch-rejects/index.txt; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    runs-on: ubuntu-latest
+    if: inputs.release_type != 'Actions'
+    needs: build
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout builder
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Download AnyKernel3 artifact
+        uses: actions/download-artifact@v8
+        with:
+          pattern: '*-AnyKernel3'
+          path: ./downloaded-artifacts
+
+      - name: Next tag
+        run: |
+          LATEST_TAG=$(gh api "repos/${{ github.repository }}/tags" --jq '.[0].name' 2>/dev/null || echo "")
+          [ -n "$LATEST_TAG" ] || LATEST_TAG="v1.0-r0"
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+          echo "NEW_TAG=$NEW_TAG" >> "$GITHUB_ENV"
+          echo "tag: $NEW_TAG"
+
+      - name: Component revisions
+        run: |
+          {
+            echo "KSUN_HASH=$(git ls-remote https://github.com/pershoot/KernelSU-Next.git refs/heads/dev-susfs | cut -f1)"
+            echo "SUSFS_61=$(git ls-remote https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/gki-android14-6.1 | cut -f1)"
+            echo "BBG_HASH=$(git ls-remote https://github.com/vc-teahouse/Baseband-guard.git refs/heads/main | cut -f1)"
+            echo "NM_HASH=$(git ls-remote https://github.com/maxsteeel/nomount.git refs/heads/dev | cut -f1)"
+          } >> "$GITHUB_ENV"
+
+      - name: Release notes
+        run: |
+          {
+            echo "SM-A556B (Galaxy A55 5G) kernel built from der-meddler/A556B-source @ \`${{ inputs.source_ref }}\`."
+            echo
+            echo "Flash the AnyKernel3 zip with the KernelSU-Next manager or a custom recovery. Stock vendor_boot, init_boot, vendor_dlkm and dtbo stay in place."
+            echo
+            echo "Features:"
+            [ "${{ inputs.ksun }}" = true ] && echo "- KernelSU-Next (pershoot dev-susfs) - https://github.com/KernelSU-Next/KernelSU-Next"
+            [ "${{ inputs.ksun }}" = true ] && [ "${{ inputs.susfs }}" = true ] && echo "- SUSFS v2.3 with inline hooks - https://gitlab.com/simonpunk/susfs4ksu"
+            [ "${{ inputs.ksun }}" = true ] && [ "${{ inputs.nomount }}" = true ] && echo "- NoMount - https://github.com/maxsteeel/nomount"
+            [ "${{ inputs.bbg }}" = true ] && echo "- Baseband Guard - https://github.com/vc-teahouse/Baseband-guard"
+            [ "${{ inputs.unicodefix }}" = true ] && echo "- Unicode path-traversal detection fix"
+            [ "${{ inputs.droidspace }}" = true ] && echo "- Droidspaces support (no PID/CPU limits) - https://github.com/ravindu644/Droidspaces-OSS"
+            [ "${{ inputs.ntsync }}" = true ] && echo "- NTsync"
+            [ "${{ inputs.bbrv3 }}" = true ] && echo "- TCP BBRv3, CAKE and PIE qdiscs"
+            [ "${{ inputs.ipv6_nat }}" = true ] && echo "- IP sets and IPv6 NAT"
+            [ "${{ inputs.ttl }}" = true ] && echo "- TTL/HL targets"
+            [ "${{ inputs.optimization }}" = true ] && echo "- WildKernels optimization patches - https://github.com/WildKernels/kernel_patches"
+            echo "- LTO: ${{ inputs.lto }}"
+            echo
+            echo "Revisions at build time:"
+            echo "- KernelSU-Next: $KSUN_HASH"
+            echo "- susfs4ksu gki-android14-6.1: $SUSFS_61"
+            echo "- Baseband-guard: $BBG_HASH"
+            echo "- NoMount: $NM_HASH"
+          } > release_body.md
+
+      - name: Zip and publish
+        run: |
+          shopt -s nullglob
+          for dir in ./downloaded-artifacts/*-AnyKernel3/; do
+            name=$(basename "$dir")
+            (cd "$dir" && zip -r -9 "../../${name}.zip" ./*)
+          done
+          ls -la ./*.zip
+          prerelease=""; [ "${{ inputs.release_type }}" = "Pre-Release" ] && prerelease="--prerelease"
+          gh release create "$NEW_TAG" ./*.zip $prerelease --title "SM-A556B kernel $NEW_TAG" --notes-file release_body.md
