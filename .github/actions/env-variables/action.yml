@@ -41,9 +41,9 @@ runs:
        GKI_DEFCONFIG="$COMMON/arch/arm64/configs/s5e8835-a54xnaxx_defconfig"
      elif [[ $BRANCH == SM-A546E* ]]; then
        GKI_DEFCONFIG="$COMMON/arch/arm64/configs/s5e8835-a54xnsxx_defconfig"
-     elif [[ "$BRANCH" == "SM-M146B-Oneui7-ADYJ2" ]]; then
+     elif [[ "$BRANCH" == "SM-M146B-Oneui7" ]]; then
        GKI_DEFCONFIG="$COMMON/arch/arm64/configs/s5e8535-m14xnsxx_defconfig"
-     elif [[ "$BRANCH" == "SM-S908B-Oneui8-bitK" ]]; then
+     elif [[ "$BRANCH" == "SM-S908B-Oneui8" ]]; then
        GKI_DEFCONFIG="$COMMON/arch/arm64/configs/s5e9925-b0sxxx_defconfig"
      elif [[ $BRANCH == SM-X610* ]]; then
       GKI_DEFCONFIG="$COMMON/arch/arm64/configs/s5e8835-gts9fepwifixx_defconfig"
