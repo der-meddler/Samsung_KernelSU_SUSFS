@@ -12,7 +12,7 @@ everything of ours lives in separate files so `git merge upstream/main` stays co
 | `.github/actions/a556b/source` | materialise the source tree, move `projects/` beside `kernel/`, add `WORKSPACE`, apply `patches/a556b`, pin `BUILD_NUMBER` to the source tag |
 | `.github/actions/a556b/toolchain` + `toolchain/manifest.tsv` | the AOSP Kleaf build system and prebuilts (clang-r487747c, build-tools, bazel, jdk11, sysroots) as pinned gitiles tarballs |
 | `.github/actions/a556b/{build,ak3zip-prep,...}` | Bazel build of `//projects/s5e8845:s5e8845_user`, AnyKernel3 packaging, naming |
-| `patches/a556b/` | the small source edits WildKernels carry on their `SM-A556B-Oneui7-bitA` branch (include reorders the SUSFS patch needs) |
+| `patches/a556b/` | the small source edits WildKernels carry on their `SM-A556B-Oneui7` branch (include reorders the SUSFS patch needs) |
 | `scripts/build-locally.sh` | the same sequence without Actions, for a shell in the container |
 | `.github/workflows/sync-upstream.yml` | daily: fast-forward `main` from WildKernels and merge it into `a556b` (needs the `FORK_SYNC_TOKEN` secret) |
 | `.github/workflows/sync-wildkernels-patches.yml` | weekly: regenerate `patches/a556b` from jimsterino's A556B branch and open a PR when it changed |

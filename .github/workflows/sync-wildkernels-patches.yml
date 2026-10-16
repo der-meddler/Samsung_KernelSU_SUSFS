@@ -19,7 +19,7 @@ on:
       branch:
         description: WildKernels/Samsung_Kernels branch to read
         type: string
-        default: SM-A556B-Oneui7-bitA
+        default: SM-A556B-Oneui7
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      WK_BRANCH: ${{ inputs.branch || 'SM-A556B-Oneui7-bitA' }}
+      WK_BRANCH: ${{ inputs.branch || 'SM-A556B-Oneui7' }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout builder

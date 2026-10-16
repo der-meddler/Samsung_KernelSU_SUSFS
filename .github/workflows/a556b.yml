@@ -107,7 +107,7 @@ concurrency:
 env:
   # Kept identical to WildKernels' branch name: their feature actions key device-specific
   # behaviour on BRANCH starting with SM-A556 (defconfig nuking, memcmp patch, build target).
-  BRANCH: SM-A556B-Oneui7-bitA
+  BRANCH: SM-A556B-Oneui7
   KERNEL_VER: "6.1"
   ANDROID_VER: android14
   BUILD_LTO: ${{ inputs.lto }}
