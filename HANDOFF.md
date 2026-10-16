@@ -20,11 +20,11 @@ Read this (and the memory files) before continuing. Everything below is already 
 
 ## Next steps
 1. (done) local test build passed; rerun any time with `git -C ~/a556b/builder pull && WS=~/a556b/ws bash ~/a556b/builder/scripts/build-locally.sh`.
-2. USER DECISION PENDING: `gh repo edit der-meddler/Samsung_KernelSU_SUSFS --default-branch a556b` (Run-workflow button needs it),
+2. (done) `gh repo edit der-meddler/Samsung_KernelSU_SUSFS --default-branch a556b` (Run-workflow button needs it),
    `gh workflow disable main.yml -R der-meddler/Samsung_KernelSU_SUSFS` (upstream's 63-device matrix).
 3. User (root in container): install the widened runner gate from `.github/runner/job-started-gate.sh`
    (reinstall command in its header) so `runner=local` works; then dispatch a556b.yml with runner=local.
-4. Dispatch a556b.yml with runner=github once (refused until a556b is the default branch: "workflow not found on the default branch") to validate the hosted path (free-disk + 25 GB swap, ~25-40 min).
+4. (done) hosted run 38824206450 passed on 2026-10-16 (34 min, ubuntu-latest): a556b is the default branch, upstream main.yml disabled; artifacts SM-A556B-A556BXXSABYI1-KSUN33383-...-AnyKernel3 + -Image to validate the hosted path (free-disk + 25 GB swap, ~25-40 min).
 5. Flash the `*-AnyKernel3.zip` on the A55 (KernelSU-Next manager / recovery); verify Wi-Fi/BT, KSU, SUSFS,
    NoMount, Droidspaces (keep SUSFS "hide sus mounts for all processes" OFF).
 6. Later phases: droidspaces fine-tuning, super.img, maybe TWRP (see memory a55x-twrp-research in the A137F memory dir).
