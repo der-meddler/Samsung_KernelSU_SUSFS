@@ -1,14 +1,14 @@
-From b0595b6a4f1eb71aa7f08e402c61a849a290d240 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: jimsterino98 <n.n.hoxha@gmail.com>
 Date: Mon, 13 Apr 2026 20:44:19 -0700
-Subject: [PATCH 3/4] Refactor includes in base.c
+Subject: [PATCH] Refactor includes in base.c
 
 ---
  fs/proc/base.c | 5 +++--
  1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index 97f66ae7c..f403692a2 100755
+index 97f66ae..f403692 100755
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
 @@ -75,6 +75,8 @@
@@ -30,6 +30,3 @@ index 97f66ae7c..f403692a2 100755
  #include <trace/events/oom.h>
  #include <trace/hooks/sched.h>
  #include "internal.h"
--- 
-2.56.0
-
