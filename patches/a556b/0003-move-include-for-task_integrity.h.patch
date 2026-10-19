@@ -1,14 +1,14 @@
-From 3a74f30e04624e991f3030225345593e7141a51a Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: jimsterino98 <n.n.hoxha@gmail.com>
 Date: Mon, 13 Apr 2026 20:42:20 -0700
-Subject: [PATCH 1/4] move include for task_integrity.h
+Subject: [PATCH] move include for task_integrity.h
 
 ---
  fs/exec.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/fs/exec.c b/fs/exec.c
-index bd53ca5ed..053a9937a 100755
+index bd53ca5..053a993 100755
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -47,6 +47,7 @@
@@ -27,6 +27,3 @@ index bd53ca5ed..053a9937a 100755
  #include <linux/coredump.h>
  
  #include <linux/uaccess.h>
--- 
-2.56.0
-

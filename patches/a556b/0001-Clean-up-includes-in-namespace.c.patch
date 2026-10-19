@@ -1,14 +1,14 @@
-From 2379f4a3d7671ccb752fd794fa043dd66680f696 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: jimsterino98 <n.n.hoxha@gmail.com>
 Date: Mon, 13 Apr 2026 20:43:04 -0700
-Subject: [PATCH 2/4] Clean up includes in namespace.c
+Subject: [PATCH] Clean up includes in namespace.c
 
 ---
  fs/namespace.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 9e5490822..13a452b39 100755
+index 9e54908..13a452b 100755
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -13,6 +13,8 @@
@@ -29,6 +29,3 @@ index 9e5490822..13a452b39 100755
  
  #include "pnode.h"
  #include "internal.h"
--- 
-2.56.0
-
