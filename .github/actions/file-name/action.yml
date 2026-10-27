@@ -7,9 +7,6 @@ inputs:
  susfs:
   description: 'susfs'
   required: true
- zeromount:
-  description: 'zeromount'
-  required: true
  nomount:
   description: 'nomount'
   required: true
@@ -47,7 +44,6 @@ runs:
      FILE_NAME="${ARTIFACT_BASE}"
      [[ "${{ inputs.ksun }}" == "true" ]] && FILE_NAME="${FILE_NAME}-KSUN${KSU_VERSION}"
      [[ "${{ inputs.susfs }}" == "true" ]] && FILE_NAME="${FILE_NAME}-SUSFS"
-     [[ "${{ inputs.zeromount }}" == "true" ]] && FILE_NAME="${FILE_NAME}-ZM"
      [[ "${{ inputs.nomount }}" == "true" ]] && FILE_NAME="${FILE_NAME}-NM"
      [[ "${{ inputs.bbg }}" == "true" ]] && FILE_NAME="${FILE_NAME}-BBG"
      [[ "${{ inputs.bbrv3 }}" == "true" ]] && FILE_NAME="${FILE_NAME}-BBRV3"

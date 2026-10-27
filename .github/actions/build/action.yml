@@ -30,7 +30,7 @@ runs:
        SCRIPT_LTO="LTO=$BUILD_LTO"
      fi
 
-     if [[ $BRANCH == SM-A055* || $BRANCH == SM-X926B* ]]; then
+     if [[ $BRANCH == SM-A055* || $BRANCH == SM-X926B* || $BRANCH == SM-A146P* ]]; then
       chmod +x build_kernel.sh
       env $SCRIPT_LTO ./build_kernel.sh || true
      elif [[ $BRANCH == SM-S926* ]]; then
@@ -74,6 +74,22 @@ runs:
       sudo apt-get install -y libyaml-dev
       chmod +x build_kernel.sh
       env $SCRIPT_LTO ./build_kernel.sh || true
+     elif [[ $BRANCH == SM-S711B-L* ]]; then
+      TOOLCHAIN_DIR="${TOOLCHAIN_DIR:-$PWD/toolchain/clang/host/linux-x86/aosp-clang/$CLANG_VER}"
+      OUT_DIR="${OUT_DIR:-$PWD/out}"
+      JOBS="${JOBS:-$(nproc)}"
+      export ARCH=arm64
+      export SUBARCH=arm64
+      export LLVM=1
+      export LLVM_IAS=1
+      export CLANG_TRIPLE=aarch64-linux-gnu
+      export CROSS_COMPILE=aarch64-linux-gnu
+      export PATH="$TOOLCHAIN_DIR/bin:$PATH"
+      export CC=clang
+      mkdir -p "$OUT_DIR"
+      make O="$OUT_DIR" ARCH=arm64 "$LOS_CONFIG" "$LOS_VAR_CONFIG"
+      echo "Building Kernel"
+      make O="$OUT_DIR" ARCH=arm64 -j"$JOBS" Image
      fi
      
      #if [[ $BRANCH == SM-S928B* || "$BRANCH" == "SM-S938B-Oneui7" || "$BRANCH" == "SM-S931B-Oneui8" || "$BRANCH" == "SM-F741B-Oneui8" || "$BRANCH" == "SM-X710-Oneui6.1.1" ]]; then

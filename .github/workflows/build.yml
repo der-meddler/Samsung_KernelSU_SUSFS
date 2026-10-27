@@ -178,7 +178,7 @@ jobs:
       - name: Set CONFIG Environment Variable
         run: |
           # Set CONFIG dynamically based on inputs values
-          CONFIG="$BRANCH-$ANDROID_VERSION_$KERNEL_VERSION"
+          CONFIG="${BRANCH}-${ANDROID_VER}_${KERNEL_VER}"
 
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
@@ -248,9 +248,9 @@ jobs:
         if: inputs.optimization == 'true' && !startsWith(env.BRANCH, 'SM-S711')
         uses: ./.github/actions/optimization
 
-      - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
-        if: ${{ env.KERNEL_VER == '6.6' }}
-        uses: ./.github/actions/6.6-fix
+#      - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
+#        if: ${{ env.KERNEL_VER == '6.6' }}
+#        uses: ./.github/actions/6.6-fix
 
       - name: Set Kernel Configuration Variables
         if: inputs.ksun == 'true'
@@ -267,7 +267,6 @@ jobs:
         with:
          ksun: ${{ inputs.ksun }}
          susfs: ${{ inputs.susfs }}
-         zeromount: ${{ inputs.zeromount }}
          nomount: ${{ inputs.nomount }}
          bbg: ${{ inputs.bbg }}
          bbrv3: ${{ inputs.bbrv3 }}

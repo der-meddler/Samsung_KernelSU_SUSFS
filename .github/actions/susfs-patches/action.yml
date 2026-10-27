@@ -35,25 +35,6 @@ runs:
 
       SUSFS4KSU="$ROOT/susfs4ksu"
       echo "SUSFS4KSU=$SUSFS4KSU" >> $GITHUB_ENV
-      
-   - name: Apply to KSUN
-     shell: bash
-     run: |
-       #cd "$COMMON/KernelSU-Next"
-       #SUSFS_VERSION="v2.1.0"
-          
-       # Apply SUSFS to KernelSU-Next
-       #cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-       #patch -p1 < 10_enable_susfs_for_ksu.patch || true
-       #rm -rf 10_enable_susfs_for_ksu.patch
-
-       #Fix rejects from adding susfs to KSUN
-       #cp "$KERNEL_PATCHES/next/susfs_fix_patches/$SUSFS_VERSION/"*.patch .
-       #rm -rf multi_manager.patch
-       #for p in *.patch; do
-       #    patch -p1 < "$p"
-       #    rm -f "$p"
-       #done
        
    - name: Copy required files
      shell: bash
@@ -64,22 +45,37 @@ runs:
       cp "$SUSFS4KSU/kernel_patches/include/linux/"* ./include/linux/
       cp "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-$ANDROID_VER-$KERNEL_VER.patch" ./          
 
-   - name: prepare namespace and open.c for susfs patch because scamsung
+   - name: prepare open.c for susfs patch
      shell: bash
      run: |
       cd "$COMMON"
       #Prepare open.c for susfs patching
       sed -i '/#ifdef CONFIG_SECURITY_DEFEX/,/^#endif/d' fs/open.c
 
-      #Prepare namespace.c for susfs patching
-      sed -i '/copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;/,/#endif/ {
+   - name: prepare namespace.c for susfs patching
+     shell: bash
+     run: |
+       cd "$COMMON"
+       #fake patch trace/hooks/blk.h for susfs patching for kernel 6.1 and 5.15
+       if [[ $KERNEL_VER == 6.1 || $KERNEL_VER == 5.15 ]]; then
+         sed -i '/#include "internal.h"/a #include <trace/hooks/blk.h>' fs/namespace.c
+       fi
+
+       #move fslog.h for susfs patch for LOS
+       if [[ $BRANCH == *LOS* ]]; then
+        sed -i '/#include <linux\/fslog.h>/d; /#include <linux\/security.h>/a #include <linux/fslog.h>' fs/namespace.c
+        sed -i '/#include <linux\/cn_proc.h>/d; /#include <linux\/slab.h>/a #include <linux/cn_proc.h>' fs/proc/base.c
+       fi
+       
+       #remove kdp_ns section for susfs patch
+       sed -i '/copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;/,/#endif/ {
         /#ifdef CONFIG_KDP_NS/,/#endif/ {
            /#else/,/#endif/!d
            /#else/d
            /#endif/d
         }
        }' fs/namespace.c
-          
+        
    - name: apply susfs patch and fix if necessary
      shell: bash
      run: |
@@ -122,6 +118,14 @@ runs:
           sed -i '/#include <linux\/pkeys.h>/a #include <linux/page_size_compat.h>' fs/proc/task_mmu.c
           echo "Added page_size_compat.h include to fs/proc/task_mmu.c"
         fi
+       
+   - name: undo namespace.c fake patch since trace/hooks/blk.h doesn't exist in kernel
+     shell: bash
+     run: |
+       cd "$COMMON"
+       if [[ $KERNEL_VER == 6.1 || $KERNEL_VER == 5.15 ]]; then
+        sed -i '/#include <trace\/hooks\/blk.h>/d' fs/namespace.c
+       fi
        
    - name: add ksu-susfs to config
      shell: bash

@@ -5,6 +5,24 @@ runs:
  using: composite
  steps:
    - name: Clone Kernel Source
+     if: ${{ !contains(env.BRANCH, 'LOS') }}
      shell: bash
      run: |
       git clone --depth 1 -b $BRANCH --single-branch https://github.com/WildKernels/Samsung_Kernels.git $CONFIG
+
+   - name: Clone Kernel Source
+     if: ${{ contains(env.BRANCH, 'LOS') }}
+     shell: bash
+     run: |
+      #LOSBRANCH, REPO, and CLANG_VER are defined in the kernel-info action!!
+      
+      git clone --depth 1 -b "$LOSBRANCH" --single-branch "$REPO" $CONFIG
+
+      #setup LOS toolchain
+      cd "$CONFIG"
+      mkdir -p toolchain/clang/host/linux-x86
+      cd toolchain/clang/host/linux-x86
+      git clone --depth 1 --filter=blob:none --sparse https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 aosp-clang
+      cd aosp-clang
+      git sparse-checkout set "$CLANG_VER"
+      

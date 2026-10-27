@@ -24,10 +24,16 @@ runs:
         curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
 
     - name: enable in defconfig
-      if: inputs.susfs == 'false'
       shell: bash
       run: |
-        "$COMMON/scripts/config" --file "$GKI_DEFCONFIG" --enable CONFIG_KSU
+         "$COMMON/scripts/config" --file "$GKI_DEFCONFIG" --enable CONFIG_KSU
+
+         if [[ ${{ inputs.susfs }} == 'true' ]]; then
+          "$COMMON/scripts/config" --file "$GKI_DEFCONFIG" --disable CONFIG_KSU_SAMSUNG_KDP
+          "$COMMON/scripts/config" --file "$GKI_DEFCONFIG" --disable CONFIG_KSU_SAMSUNG_RKP
+          "$COMMON/scripts/config" --file "$GKI_DEFCONFIG" --disable CONFIG_KSU_SAMSUNG_DEFEX
+          "$COMMON/scripts/config" --file "$GKI_DEFCONFIG" --disable CONFIG_KSU_SAMSUNG_NO_PATCH_TEXT
+         fi
       
     - name: Extract KSU Version Info and inject into Kbuild
       shell: bash
@@ -51,14 +57,14 @@ runs:
         echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
         echo "KSU_COMMIT=$KSU_COMMIT" >> $GITHUB_ENV
 
-    - name: 'Fix KernelSU-Next'
-      if: inputs.susfs == 'true'
-      shell: bash
-      run: |
-        set -euo pipefail
-        cd "$COMMON/KernelSU-Next"
-        sed -i \
-        -e 's/^static int security_context_to_sid_with_policy(/int security_context_to_sid_with_policy(/' \
-        -e 's/^static int security_sid_to_context_with_policy(/int security_sid_to_context_with_policy(/' \
-        -e 's/^static void security_compute_av_user_with_policy(/void security_compute_av_user_with_policy(/' \
-        kernel/feature/selinux_hide.c
+#    - name: 'Fix KernelSU-Next'
+#      if: inputs.susfs == 'true'
+#      shell: bash
+#      run: |
+#        set -euo pipefail
+#        cd "$COMMON/KernelSU-Next"
+#        sed -i \
+#        -e 's/^static int security_context_to_sid_with_policy(/int security_context_to_sid_with_policy(/' \
+#        -e 's/^static int security_sid_to_context_with_policy(/int security_sid_to_context_with_policy(/' \
+#        -e 's/^static void security_compute_av_user_with_policy(/void security_compute_av_user_with_policy(/' \
+#        kernel/feature/selinux_hide.c
