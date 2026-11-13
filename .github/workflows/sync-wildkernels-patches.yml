@@ -38,7 +38,6 @@ jobs:
     timeout-minutes: 30
     env:
       WK_BRANCH: ${{ inputs.branch || 'SM-A556B-Oneui7' }}
-      WORK: ${{ runner.temp }}/wk-sync
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout builder
@@ -46,7 +45,10 @@ jobs:
 
       - name: Regenerate and compare the patch set
         id: sync
-        run: bash scripts/wk-patch-sync.sh
+        run: |
+          # outside the checkout, so the clones never end up in the pull request
+          echo "WORK=$RUNNER_TEMP/wk-sync" >> "$GITHUB_ENV"
+          WORK="$RUNNER_TEMP/wk-sync" bash scripts/wk-patch-sync.sh
 
       - name: Open a pull request
         if: steps.sync.outputs.changed == 'true'
